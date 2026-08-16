@@ -23,7 +23,7 @@ router.post('/generate', withAIQuota('quiz_generation'), async (req: Request, re
 
   try {
     const response = await routeRequest(aiReq);
-    consumeUserQuota(aiReq.userId, aiReq.feature).catch(console.error);
+    consumeUserQuota(aiReq.userId, aiReq.feature, req.body?.model_tier || req.headers?.['x-model-tier'] || 'default').catch(console.error);
     
     let questionsData = response.result;
     if (questionsData && typeof questionsData === 'object' && !Array.isArray(questionsData) && Array.isArray(questionsData.questions)) {

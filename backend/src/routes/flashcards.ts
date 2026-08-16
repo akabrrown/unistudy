@@ -63,7 +63,7 @@ router.post('/generate', withAIQuota('flashcard_generation'), async (req: Reques
       console.log(`[Flashcards] Result keys: ${Object.keys(response.result).join(', ')}`)
     }
     
-    consumeUserQuota(aiReq.userId, aiReq.feature).catch(console.error);
+    consumeUserQuota(aiReq.userId, aiReq.feature, req.body?.model_tier || req.headers?.['x-model-tier'] || 'default').catch(console.error);
     
     // Parse result robustly (array, JSON string, or object with array property)
     let rawResult = response.result;

@@ -29,6 +29,7 @@ import searchRoutes from './routes/search';
 import pastPapersRoutes from './routes/past-papers';
 import translateRoutes from './routes/translate';
 import billingRoutes from './routes/billing';
+import drillsRouter from './routes/drills';
 
 const HEALTH_PATHS = new Set(['/ping', '/api/health']);
 
@@ -67,6 +68,7 @@ app.use('/api/notes', notesRoutes);
 app.use('/api/past-papers', pastPapersRoutes);
 app.use('/api/flashcards', flashcardsRoutes);
 app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/drills', drillsRouter);
 app.use('/api/search', searchRoutes);
 app.use('/api/quota', quotaRoutes);
 app.use('/api/payments', paymentsRoutes);

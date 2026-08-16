@@ -148,6 +148,26 @@ def process_file_task(file_path: str, lecture_id: str, user_id: str, is_pptx: bo
                 "explanation": explanation,
                 "image_url": image_url
             }
+
+            # 3. Generate embedding
+            if raw_text:
+                try:
+                    embed_payload = {
+                        "inputs": raw_text,
+                        "url": "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+                    }
+                    embed_result = execute_ai_task(
+                        user_id=user_id,
+                        category="search",
+                        payload=embed_payload,
+                        provider_func=huggingface_search,
+                    )
+                    emb_resp = embed_result.get("response", [])
+                    if emb_resp and isinstance(emb_resp, list):
+                        slide_record["embedding"] = str(emb_resp).replace(" ", "")
+                except Exception as e:
+                    print(f"Error generating embedding for slide {sn}: {e}")
+
             try:
                 supabase.table("slides").insert(slide_record).execute()
                 print(f"Inserted slide {sn} into DB.")

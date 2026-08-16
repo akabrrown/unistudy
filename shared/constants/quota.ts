@@ -65,47 +65,53 @@ export const FEATURE_PROVIDER_MAP: Record<Feature, ProviderName> = {
 }
 
 export const FEATURE_COSTS: Record<Feature, number> = {
-  slide_explanation: 2,
-  flashcard_generation: 2,
-  quiz_generation: 2,
-  past_paper_grading: 2,
-  past_paper_question: 2,
-  lecture_tagging: 2,
-  difficulty_rating: 2,
-  topic_summary: 2,
-  trend_analysis: 2,
-  weakness_drill: 2,
-  gap_filler: 2,
-  semester_narrative: 2,
-  handwriting_scan: 2,
-  answer_improver: 2,
-  study_poster: 2,
-  cheat_sheet: 2,
-  generate_mnemonics: 2,
+  slide_explanation: 200,
+  flashcard_generation: 200,
+  quiz_generation: 200,
+  past_paper_grading: 200,
+  past_paper_question: 200,
+  lecture_tagging: 200,
+  difficulty_rating: 200,
+  topic_summary: 200,
+  trend_analysis: 200,
+  weakness_drill: 200,
+  gap_filler: 200,
+  semester_narrative: 200,
+  handwriting_scan: 200,
+  answer_improver: 200,
+  study_poster: 200,
+  cheat_sheet: 200,
+  generate_mnemonics: 200,
 
-  calculator: 1,
-  chat_message: 1,
-  debate_mode: 1,
-  oral_exam: 1,
-  revision_song: 1,
+  calculator: 100,
+  chat_message: 100,
+  debate_mode: 100,
+  oral_exam: 100,
+  revision_song: 100,
 
-  daily_brief: 1,
-  motivational_quote: 1,
-  break_suggestion: 1,
+  daily_brief: 100,
+  motivational_quote: 100,
+  break_suggestion: 100,
 
   slide_embedding: 0,
   search_embedding: 0,
   flashcard_embedding: 0,
   
-  semantic_search_rerank: 1,
-  youtube_search: 1
+  semantic_search_rerank: 100,
+  youtube_search: 100
+}
+
+export const MODEL_MULTIPLIERS: Record<string, number> = {
+  'fast': 0.5,     // e.g. Gemini Flash, Groq 8B
+  'smart': 2.0,    // e.g. Gemini Pro, Groq 70B
+  'default': 1.0
 }
 
 // Every user gets these daily allowances for free, resets at midnight.
 export const FREE_DAILY_ALLOWANCES: Record<string, number> = {
-  gemini: 50,
-  groq70: 10,
-  groq8: 20,
+  gemini: 5000,
+  groq70: 1000,
+  groq8: 2000,
   cohere: 0, // Cohere has no free daily allowance, strictly uses credits or fallback if needed
-  youtube: 3
+  youtube: 300
 }

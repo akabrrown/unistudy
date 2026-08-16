@@ -5,6 +5,7 @@ import { signout } from '../(auth)/actions'
 import { Button } from '@/components/ui/button'
 // Removed Gamification Component
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
+import { ModelSelector } from '@/components/layout/ModelSelector'
 import SmartSearchBar from '@/components/layout/SmartSearchBar'
 import { 
   LayoutDashboard, 
@@ -136,6 +137,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="px-2 mb-4">
             {/* Removed Gamification Bar */}
           </div>
+
+          <ModelSelector />
 
           <div className="flex items-center gap-2 mb-6 px-2">
             <div className="flex-1">

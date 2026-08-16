@@ -168,15 +168,15 @@ export default function CoursesPage() {
     }
   }
 
-  const activeCourses = courses.filter(c => !c.is_archived);
-  const archivedCourses = courses.filter(c => c.is_archived);
+  const activeCourses = courses.filter(c => !c.is_archived && c.colour !== '#hidden');
+  const archivedCourses = courses.filter(c => c.is_archived && c.colour !== '#hidden');
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Courses</h1>
-          <p className="text-muted-foreground">{courses.length} active modules</p>
+          <p className="text-muted-foreground">{activeCourses.length} active modules</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isCourseDialogOpen} onOpenChange={setIsCourseDialogOpen}>

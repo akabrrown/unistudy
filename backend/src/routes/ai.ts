@@ -143,7 +143,7 @@ router.post('/scan-notes', upload.single('file'), withAIQuota('handwriting_scan'
     else if (cleanTranscription.startsWith('```')) cleanTranscription = cleanTranscription.substring(3).trim();
     if (cleanTranscription.endsWith('```')) cleanTranscription = cleanTranscription.substring(0, cleanTranscription.length - 3).trim();
 
-    consumeUserQuota(req.user!.id, 'handwriting_scan').catch(console.error);
+    consumeUserQuota(req.user!.id, 'handwriting_scan', req.body?.model_tier || req.headers?.['x-model-tier'] || 'default').catch(console.error);
     res.json({ transcription: cleanTranscription });
   } catch (err: any) {
     console.error('Notes Scanner Error:', err);
@@ -195,7 +195,7 @@ router.post('/ask', async (req: Request, res: Response) => {
     const response = await routeRequest(aiReq);
     
     // Deduct quota asynchronously
-    consumeUserQuota(aiReq.userId, aiReq.feature).catch(console.error);
+    consumeUserQuota(aiReq.userId, aiReq.feature, req.body?.model_tier || req.headers?.['x-model-tier'] || 'default').catch(console.error);
     
     // For streaming like the calculator feature, the provider might return a stream object
     if (payload.stream && response.result?.tee) {
@@ -231,7 +231,7 @@ router.post('/calculator', withAIQuota('calculator'), async (req: Request, res: 
   try {
     const response = await routeRequest(aiReq);
     
-    consumeUserQuota(aiReq.userId, aiReq.feature).catch(console.error);
+    consumeUserQuota(aiReq.userId, aiReq.feature, req.body?.model_tier || req.headers?.['x-model-tier'] || 'default').catch(console.error);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -383,7 +383,7 @@ CRITICAL COPY CONSTRAINTS (Human Voice Only):
     res.write('data: [DONE]\n\n');
     res.end();
 
-    consumeUserQuota(req.user!.id, 'slide_explanation').catch(console.error);
+    consumeUserQuota(req.user!.id, 'slide_explanation', req.body?.model_tier || req.headers?.['x-model-tier'] || 'default').catch(console.error);
   } catch (err: any) {
     console.error('Gemini API Error:', err);
     if (!res.headersSent) {

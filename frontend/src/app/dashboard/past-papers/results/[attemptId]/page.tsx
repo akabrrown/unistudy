@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle2, XCircle, Loader2, Award, Bot, RefreshCw, MessageSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 export default function ExamResults() {
   const params = useParams()
@@ -24,7 +25,7 @@ export default function ExamResults() {
       // 1. Fetch Attempt & Answers
       const { data: attData } = await supabase
         .from('past_paper_attempts')
-        .select('*, past_papers(*)')
+        .select('*, past_papers!past_paper_attempts_past_paper_id_fkey(*)')
         .eq('id', params.attemptId)
         .single()
         
@@ -47,46 +48,63 @@ export default function ExamResults() {
       let totalAvail = 0
       const gradedAnswers = [...ansData]
 
-      // 2. Grade any ungraded answers via AI
-      for (let i = 0; i < gradedAnswers.length; i++) {
-        const ans = gradedAnswers[i]
-        const q = ans.past_paper_questions
-        totalAvail += (q.marks_available || 0)
+      // 2. Grade any ungraded answers via AI using batch endpoint
+      const ungraded = gradedAnswers.filter(a => a.marks_awarded === null);
+      
+      if (ungraded.length > 0) {
+        const payload = ungraded.map(ans => {
+          const q = ans.past_paper_questions;
+          totalAvail += (q.marks_available || 0);
+          return {
+            id: ans.id,
+            question_content: q.text_content,
+            marks_available: q.marks_available,
+            student_answer: ans.user_answer_text?.trim() ? ans.user_answer_text : "[No answer provided]"
+          };
+        });
 
-        if (ans.marks_awarded === null && ans.user_answer_text) {
-          try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8005'}/api/past-papers/grade`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                ...(session && { Authorization: `Bearer ${session.access_token}` })
-              },
-              body: JSON.stringify({
-                question_content: q.text_content,
-                marks_available: q.marks_available,
-                student_answer: ans.user_answer_text,
-                is_ultra: false // could pull from user profile
-              })
-            })
-            const result = await res.json()
-            
-            if (result.success && result.data) {
-              ans.marks_awarded = result.data.marks_awarded
-              ans.feedback = result.data.feedback
-              ans.model_answer = result.data.model_answer
-              
-              // Persist to DB
-              await supabase.from('past_paper_answers').update({
-                marks_awarded: ans.marks_awarded,
-                feedback: ans.feedback,
-                model_answer: ans.model_answer
-              }).eq('id', ans.id)
+        const courseId = attData?.past_papers?.course_id;
+
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8005'}/api/past-papers/grade-batch`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              ...(session && { Authorization: `Bearer ${session.access_token}` })
+            },
+            body: JSON.stringify({ answers: payload, is_ultra: false, course_id: courseId })
+          });
+          const result = await res.json();
+          
+          if (result.success && result.data && Array.isArray(result.data)) {
+            // Apply results
+            for (const gradedItem of result.data) {
+              const ans = gradedAnswers.find(a => a.id === gradedItem.id);
+              if (ans) {
+                ans.marks_awarded = gradedItem.marks_awarded;
+                ans.feedback = gradedItem.feedback;
+                ans.model_answer = gradedItem.model_answer;
+                
+                // Persist to DB
+                await supabase.from('past_paper_answers').update({
+                  marks_awarded: ans.marks_awarded,
+                  feedback: ans.feedback,
+                  model_answer: ans.model_answer
+                }).eq('id', ans.id);
+              }
             }
-          } catch (e) {
-            console.error('Grading failed for', ans.id, e)
           }
+        } catch (e) {
+          console.error('Batch grading failed', e);
         }
-        totalAwarded += (ans.marks_awarded || 0)
+      }
+
+      // Calculate total awarded and total available for already graded ones
+      for (const ans of gradedAnswers) {
+        if (!ungraded.find(u => u.id === ans.id)) {
+            totalAvail += (ans.past_paper_questions.marks_available || 0);
+        }
+        totalAwarded += (ans.marks_awarded || 0);
       }
 
       setAnswers(gradedAnswers)
@@ -99,6 +117,20 @@ export default function ExamResults() {
         await supabase.from('past_paper_attempts').update({
           score_percentage: pct
         }).eq('id', params.attemptId)
+
+        // Trigger drills generation
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8005'}/api/drills/generate-from-attempt`, {
+             method: 'POST',
+             headers: {
+                 'Content-Type': 'application/json',
+                 ...(session && { Authorization: `Bearer ${session.access_token}` })
+             },
+             body: JSON.stringify({ attemptId: params.attemptId })
+          })
+        } catch (e) {
+          console.error("Failed to generate drills", e)
+        }
       }
       
       setGrading(false)
@@ -145,11 +177,13 @@ export default function ExamResults() {
                 <Link href="/dashboard/past-papers">
                   <Button variant="outline">Back to Bank</Button>
                 </Link>
-                <Link href="/dashboard/focus">
-                  <Button className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20 border-none">
-                    <RefreshCw className="w-4 h-4 mr-2" /> Start Weakness Drill
-                  </Button>
-                </Link>
+                {attempt?.past_papers?.course_id && (
+                  <Link href={`/dashboard/courses/${attempt.past_papers.course_id}/past-papers`}>
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20 border-none">
+                      <RefreshCw className="w-4 h-4 mr-2" /> Start Weakness Drill
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
             
@@ -181,8 +215,9 @@ export default function ExamResults() {
         
         {answers.map((ans, idx) => {
           const q = ans.past_paper_questions
-          const isPerfect = ans.marks_awarded === q.marks_available
-          const isZero = ans.marks_awarded === 0
+          const marksAwarded = ans.marks_awarded || 0
+          const isPerfect = marksAwarded === q.marks_available
+          const isZero = marksAwarded === 0
           
           return (
             <Card key={ans.id} className={`border-l-4 ${isPerfect ? 'border-l-green-500' : isZero ? 'border-l-destructive' : 'border-l-yellow-500'}`}>
@@ -193,7 +228,7 @@ export default function ExamResults() {
                     <p className="text-sm text-muted-foreground mt-1">{q.text_content}</p>
                   </div>
                   <div className={`px-3 py-1 rounded-full font-bold text-sm ${isPerfect ? 'bg-green-500/10 text-green-600' : isZero ? 'bg-destructive/10 text-destructive' : 'bg-yellow-500/10 text-yellow-600'}`}>
-                    {ans.marks_awarded} / {q.marks_available}
+                    {marksAwarded} / {q.marks_available}
                   </div>
                 </div>
               </CardHeader>

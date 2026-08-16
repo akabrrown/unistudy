@@ -86,7 +86,9 @@ export default async function PastPapersPage(props: { params: Promise<{ courseId
                 {activeDrills.map(drill => (
                   <div key={drill.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                     <span className="text-sm font-medium line-clamp-1" title={drill.topic}>{drill.topic}</span>
-                    <Button size="sm" variant="secondary" className="h-7 text-xs flex-shrink-0">Drill</Button>
+                    <Link href={`/dashboard/past-papers/drills/${drill.id}`}>
+                      <Button size="sm" variant="secondary" className="h-7 text-xs flex-shrink-0">Drill</Button>
+                    </Link>
                   </div>
                 ))}
               </div>

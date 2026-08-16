@@ -47,7 +47,7 @@ export default function BillingSettings() {
             </h3>
             
             <div className="flex items-end gap-3">
-              <span className="text-4xl font-extrabold text-foreground">{balance}</span>
+              <span className="text-4xl font-extrabold text-foreground">{(balance / 100).toFixed(2).replace(/\.00$/, '')}</span>
               <Button onClick={() => document.getElementById('top-up-options')?.scrollIntoView({ behavior: 'smooth' })}>
                 Top Up Credits
               </Button>
@@ -143,7 +143,7 @@ export default function BillingSettings() {
               <CardFooter className="pt-0">
                 <CheckoutButton 
                   amount={bundle.price}
-                  credits={bundle.credits}
+                  credits={bundle.credits * 100}
                   label="Purchase Bundle"
                   className={`w-full py-2.5 rounded-lg font-semibold transition-all border text-sm shadow-xs ${
                     bundle.popular 

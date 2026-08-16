@@ -25,6 +25,8 @@ async function withRetry(fn: () => Promise<Response>): Promise<Response> {
   throw lastError;
 }
 
+import { useModelStore } from '../stores/modelStore';
+
 async function buildHeaders(options: RequestInit): Promise<Headers> {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -35,6 +37,11 @@ async function buildHeaders(options: RequestInit): Promise<Headers> {
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
+  
+  // Attach the selected model tier globally to all API requests
+  const selectedTier = useModelStore.getState().selectedTier;
+  headers.set('x-model-tier', selectedTier);
+  
   return headers;
 }
 

@@ -28,6 +28,7 @@ export type AIRequest = {
     messages?: any[]
   }
   userSettings?: any
+  model_tier?: string
   userId: string
   priority: 'high' | 'medium' | 'low'
   identifiers?: string[]
@@ -47,8 +48,15 @@ export async function routeRequest(request: AIRequest): Promise<AIResponse> {
   const start = Date.now()
   
 
-
   let provider = FEATURE_PROVIDER_MAP[request.feature] || 'gemini';
+  
+  // Override provider based on selected model tier
+  if (request.model_tier === 'fast') {
+    provider = provider.includes('groq') ? 'groq_8b' : 'gemini';
+  } else if (request.model_tier === 'smart') {
+    provider = provider.includes('groq') ? 'groq_70b' : 'gemini'; // ideally we'd have gemini_pro
+  }
+
   let result = null;
 
   try {

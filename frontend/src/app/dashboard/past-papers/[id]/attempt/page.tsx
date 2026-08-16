@@ -10,22 +10,6 @@ import { createClient } from '@/lib/supabase/client'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-const OPTION_LETTER_STYLES: Record<string, string> = {
-  A: 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300',
-  B: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300',
-  C: 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300',
-  D: 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300',
-  E: 'bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-300',
-}
-
-const OPTION_ROW_STYLES: Record<string, string> = {
-  A: 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20',
-  B: 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20',
-  C: 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20',
-  D: 'border-rose-200 bg-rose-50/50 dark:border-rose-800 dark:bg-rose-950/20',
-  E: 'border-violet-200 bg-violet-50/50 dark:border-violet-800 dark:bg-violet-950/20',
-}
-
 function parseMcqContent(text: string): { stem: string; options: { letter: string; text: string }[] } {
   const optionRx = /(?:^|\n)[ \t]*([A-Ea-e])[.)][ \t]+(.+)/g
   const firstOptionIdx = text.search(/(?:^|\n)[ \t]*[A-Ea-e][.)][ \t]+\S/)
@@ -68,9 +52,13 @@ export default function ExamAttempt() {
         let sortedQs = [...qData].sort((a, b) => 
           a.question_number.localeCompare(b.question_number, undefined, { numeric: true })
         )
-        // Detect MCQs by presence of labelled options; always override to 1 mark
+        // Detect MCQs using the AI classification stored in extracted_topic, fallback to regex
         sortedQs = sortedQs.map(q => {
-          const isMcq = /(?:^|\n)[ \t]*[A-Ea-e][.)][ \t]+\S/m.test(q.text_content)
+          const hasPrefix = q.extracted_topic && q.extracted_topic.includes('|')
+          const isMcq = hasPrefix 
+            ? q.extracted_topic.startsWith('MCQ|')
+            : /(?:^|\n)[ \t]*[A-Ea-e][.)][ \t]+\S/m.test(q.text_content)
+            
           return isMcq ? { ...q, marks_available: 1, isMcq: true } : { ...q, isMcq: false }
         })
         setQuestions(sortedQs)
@@ -126,19 +114,41 @@ export default function ExamAttempt() {
     setSubmitting(true)
     
     // Save answers
-    const inserts = questions.map(q => ({
-      attempt_id: attemptId,
-      question_id: q.id,
-      user_answer_text: answers[q.id] || '',
-      marks_awarded: null
-    }))
+    const inserts = questions.map((q, idx) => {
+      let userAnswer = answers[q.id] || ''
+      
+      if (!userAnswer && !q.isMcq) {
+        userAnswer = answers[q.id] || ''
+      }
+
+      return {
+        attempt_id: attemptId,
+        question_id: q.id,
+        question_num: parseInt(q.question_number) || (idx + 1),
+        user_answer_text: userAnswer,
+        marks_awarded: null
+      }
+    })
     
-    await supabase.from('past_paper_answers').insert(inserts)
+    const { error: insertErr } = await supabase.from('past_paper_answers').insert(inserts)
+    if (insertErr) {
+      console.error("Failed to insert answers:", insertErr)
+      alert("Failed to submit exam: " + insertErr.message)
+      setSubmitting(false)
+      return
+    }
     
     // Mark attempt completed
-    await supabase.from('past_paper_attempts').update({
+    const { error: updateErr } = await supabase.from('past_paper_attempts').update({
       completed_at: new Date().toISOString()
     }).eq('id', attemptId)
+    
+    if (updateErr) {
+      console.error("Failed to update attempt:", updateErr)
+      alert("Failed to mark attempt as completed: " + updateErr.message)
+      setSubmitting(false)
+      return
+    }
 
     router.push(`/dashboard/past-papers/results/${attemptId}`)
   }
@@ -176,41 +186,42 @@ export default function ExamAttempt() {
                 </CardHeader>
                 <CardContent className="pt-6">
                   {(() => {
-                    const { stem, options } = parseMcqContent(q.text_content)
+                    const { stem, options } = parseMcqContent(q.text_content.replace(/<br\s*\/?>/gi, '\n'))
                     return (
                       <>
                         {stem && (
-                          <div className="prose prose-sm dark:prose-invert max-w-none mb-5 [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-border [&_th]:border [&_th]:border-border [&_th]:bg-muted/50 [&_th]:p-2 [&_td]:border [&_td]:border-border [&_td]:p-2">
+                          <div className="prose prose-sm dark:prose-invert max-w-none mb-5 whitespace-pre-wrap [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-border [&_th]:border [&_th]:border-border [&_th]:bg-muted/50 [&_th]:p-2 [&_td]:border [&_td]:border-border [&_td]:p-2">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{stem}</ReactMarkdown>
                           </div>
                         )}
 
                         {options.length > 0 && (
-                          <div className="space-y-2 mb-6">
-                            {options.map(opt => (
-                              <div
-                                key={opt.letter}
-                                className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${OPTION_ROW_STYLES[opt.letter] ?? 'border-border bg-muted/20'}`}
-                              >
-                                <span className={`shrink-0 flex h-6 w-6 items-center justify-center rounded font-bold text-xs ${OPTION_LETTER_STYLES[opt.letter] ?? 'bg-muted text-foreground'}`}>
-                                  {opt.letter}
-                                </span>
-                                <span className="text-foreground/90 leading-relaxed">{opt.text}</span>
-                              </div>
-                            ))}
+                          <div className="space-y-3">
+                            {options.map(opt => {
+                              const isSelected = answers[q.id] === opt.letter;
+                              return (
+                                <div
+                                  key={opt.letter}
+                                  onClick={() => handleAnswerChange(q.id, opt.letter)}
+                                  className={`flex items-start gap-4 rounded-xl border p-4 text-sm cursor-pointer transition-all ${
+                                    isSelected
+                                      ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                                      : 'border-border bg-card hover:border-primary/40 hover:bg-muted/10'
+                                  }`}
+                                >
+                                  <div className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-full font-bold text-xs border ${
+                                    isSelected
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'bg-muted text-muted-foreground border-border'
+                                  }`}>
+                                    {opt.letter}
+                                  </div>
+                                  <div className="text-foreground/90 leading-relaxed pt-0.5">{opt.text}</div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground">Your answer</label>
-                          <Textarea
-                            placeholder="Enter the letter of your choice (e.g. A)"
-                            className="min-h-[56px] font-mono text-sm resize-none uppercase"
-                            maxLength={1}
-                            value={answers[q.id] || ''}
-                            onChange={(e) => handleAnswerChange(q.id, e.target.value.toUpperCase())}
-                          />
-                        </div>
                       </>
                     )
                   })()}
@@ -234,9 +245,9 @@ export default function ExamAttempt() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <div className="prose prose-sm dark:prose-invert max-w-none mb-6 [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-border [&_th]:border [&_th]:border-border [&_th]:bg-muted/50 [&_th]:p-2 [&_td]:border [&_td]:border-border [&_td]:p-2">
+                  <div className="prose prose-sm dark:prose-invert max-w-none mb-6 whitespace-pre-wrap [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-border [&_th]:border [&_th]:border-border [&_th]:bg-muted/50 [&_th]:p-2 [&_td]:border [&_td]:border-border [&_td]:p-2">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {q.text_content}
+                      {q.text_content.replace(/<br\s*\/?>/gi, '\n')}
                     </ReactMarkdown>
                   </div>
                   
@@ -248,8 +259,8 @@ export default function ExamAttempt() {
                       </Button>
                     </label>
                     <Textarea 
-                      placeholder="Type your detailed answer here..."
-                      className="min-h-[150px] font-mono text-sm resize-y"
+                      placeholder="Type your detailed answer here. (You can explicitly label your answers for sub-parts like a, b, etc.)"
+                      className="min-h-[250px] font-mono text-sm resize-y"
                       value={answers[q.id] || ''}
                       onChange={(e) => handleAnswerChange(q.id, e.target.value)}
                     />

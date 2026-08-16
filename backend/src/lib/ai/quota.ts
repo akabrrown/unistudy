@@ -1,6 +1,6 @@
 import { redis } from '../redis';
 import { supabaseAdmin } from '../supabase';
-import { Feature, FEATURE_PROVIDER_MAP, FEATURE_COSTS, PROVIDER_CONFIG, FREE_DAILY_ALLOWANCES } from '@unistudy/shared/constants/quota';
+import { Feature, FEATURE_PROVIDER_MAP, FEATURE_COSTS, PROVIDER_CONFIG, FREE_DAILY_ALLOWANCES, MODEL_MULTIPLIERS } from '@unistudy/shared/constants/quota';
 
 export type QuotaCheckResult = {
   allowed: boolean
@@ -56,9 +56,11 @@ export async function getUserQuota(userId: string) {
   return result;
 }
 
-export async function checkUserQuota(userId: string, feature: Feature): Promise<QuotaCheckResult> {
+export async function checkUserQuota(userId: string, feature: Feature, model_tier: string = 'default'): Promise<QuotaCheckResult> {
   const provider = FEATURE_PROVIDER_MAP[feature]
-  const cost = FEATURE_COSTS[feature]
+  const baseCost = FEATURE_COSTS[feature]
+  const multiplier = MODEL_MULTIPLIERS[model_tier] || MODEL_MULTIPLIERS['default']
+  const cost = Math.round(baseCost * multiplier)
   const config = PROVIDER_CONFIG[provider]
 
   if (!config.has_user_quota || !config.user_quota_column) {
@@ -95,9 +97,11 @@ export async function checkUserQuota(userId: string, feature: Feature): Promise<
   }
 }
 
-export async function consumeUserQuota(userId: string, feature: Feature) {
+export async function consumeUserQuota(userId: string, feature: Feature, model_tier: string = 'default') {
   const provider = FEATURE_PROVIDER_MAP[feature]
-  const cost = FEATURE_COSTS[feature]
+  const baseCost = FEATURE_COSTS[feature]
+  const multiplier = MODEL_MULTIPLIERS[model_tier] || MODEL_MULTIPLIERS['default']
+  const cost = Math.round(baseCost * multiplier)
   if (cost <= 0) return true;
 
   const config = PROVIDER_CONFIG[provider]

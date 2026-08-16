@@ -11,19 +11,29 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 const OPTION_LETTER_STYLES: Record<string, string> = {
-  A: 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300',
-  B: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300',
-  C: 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300',
-  D: 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300',
-  E: 'bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-300',
+  A: 'bg-muted/50 text-muted-foreground border border-border/50',
+  B: 'bg-muted/50 text-muted-foreground border border-border/50',
+  C: 'bg-muted/50 text-muted-foreground border border-border/50',
+  D: 'bg-muted/50 text-muted-foreground border border-border/50',
+  E: 'bg-muted/50 text-muted-foreground border border-border/50',
 }
 
 const OPTION_ROW_STYLES: Record<string, string> = {
-  A: 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20',
-  B: 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20',
-  C: 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20',
-  D: 'border-rose-200 bg-rose-50/50 dark:border-rose-800 dark:bg-rose-950/20',
-  E: 'border-violet-200 bg-violet-50/50 dark:border-violet-800 dark:bg-violet-950/20',
+  A: 'border-border bg-card hover:bg-muted/30 transition-colors',
+  B: 'border-border bg-card hover:bg-muted/30 transition-colors',
+  C: 'border-border bg-card hover:bg-muted/30 transition-colors',
+  D: 'border-border bg-card hover:bg-muted/30 transition-colors',
+  E: 'border-border bg-card hover:bg-muted/30 transition-colors',
+}
+
+const cleanTopic = (topic: string) => {
+  if (!topic) return ''
+  let cleaned = topic.replace(/^(MCQ|THEORY)\|/i, '')
+  cleaned = cleaned.split(/<br\s*\/?>|\n/i)[0]
+  if (cleaned.length > 50) {
+    cleaned = cleaned.substring(0, 47) + '...'
+  }
+  return cleaned.trim()
 }
 
 function parseMcqContent(text: string): { stem: string; options: { letter: string; text: string }[] } {
@@ -70,9 +80,13 @@ export default function PastPaperDetails() {
             a.question_number.localeCompare(b.question_number, undefined, { numeric: true })
           )
           
-          // Detect MCQs by presence of labelled options; always override to 1 mark
+          // Detect MCQs using the AI classification stored in extracted_topic, fallback to regex
           sortedQs = sortedQs.map(q => {
-            const isMcq = /(?:^|\n)[ \t]*[A-Ea-e][.)][ \t]+\S/m.test(q.text_content)
+            const hasPrefix = q.extracted_topic && q.extracted_topic.includes('|')
+            const isMcq = hasPrefix 
+              ? q.extracted_topic.startsWith('MCQ|')
+              : /(?:^|\n)[ \t]*[A-Ea-e][.)][ \t]+\S/m.test(q.text_content)
+              
             return isMcq ? { ...q, marks_available: 1, isMcq: true } : { ...q, isMcq: false }
           })
           
@@ -116,6 +130,18 @@ export default function PastPaperDetails() {
 
     if (!error && data) {
       router.push(`/dashboard/past-papers/${paper.id}/attempt?attemptId=${data.id}`)
+    } else {
+      // 409 Conflict means an attempt likely already exists
+      const { data: existingData } = await supabase
+        .from('past_paper_attempts')
+        .select('id')
+        .eq('past_paper_id', paper.id)
+        .eq('user_id', session.user.id)
+        .single()
+        
+      if (existingData) {
+        router.push(`/dashboard/past-papers/${paper.id}/attempt?attemptId=${existingData.id}`)
+      }
     }
   }
 
@@ -183,7 +209,7 @@ export default function PastPaperDetails() {
                         </div>
                         <div className="text-sm text-foreground/80">
                           {(() => {
-                            const { stem, options } = parseMcqContent(q.text_content)
+                            const { stem, options } = parseMcqContent(q.text_content.replace(/<br\s*\/?>/gi, '\n'))
                             return (
                               <>
                                 {stem && (
@@ -212,7 +238,7 @@ export default function PastPaperDetails() {
                         </div>
                         {q.extracted_topic && (
                           <div className="mt-3 inline-block text-[10px] uppercase tracking-wider font-semibold text-purple-500 bg-purple-500/10 px-2 py-1 rounded">
-                            {q.extracted_topic}
+                            {cleanTopic(q.extracted_topic)}
                           </div>
                         )}
                       </div>
@@ -233,12 +259,12 @@ export default function PastPaperDetails() {
                         </div>
                         <div className="text-sm text-foreground/80 prose prose-sm dark:prose-invert max-w-none [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-border [&_th]:border [&_th]:border-border [&_th]:bg-muted/50 [&_th]:p-2 [&_td]:border [&_td]:border-border [&_td]:p-2">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {q.text_content}
+                            {q.text_content.replace(/<br\s*\/?>/gi, '\n')}
                           </ReactMarkdown>
                         </div>
                         {q.extracted_topic && (
                           <div className="mt-3 inline-block text-[10px] uppercase tracking-wider font-semibold text-purple-500 bg-purple-500/10 px-2 py-1 rounded">
-                            {q.extracted_topic}
+                            {cleanTopic(q.extracted_topic)}
                           </div>
                         )}
                       </div>

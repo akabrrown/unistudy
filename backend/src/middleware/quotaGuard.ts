@@ -9,8 +9,11 @@ export function withAIQuota(feature: Feature) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
+      // Extract model_tier from body or headers if present
+      const modelTier = req.body?.model_tier || req.headers['x-model-tier'] || 'default';
+      
       // We need user plan, we can fetch it, but better, quota check fetches it
-      const quotaStatus = await checkUserQuota(req.user.id, feature);
+      const quotaStatus = await checkUserQuota(req.user.id, feature, modelTier as string);
 
       if (!quotaStatus.allowed) {
         return res.status(403).json({
