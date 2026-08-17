@@ -6,6 +6,7 @@ import CheckoutButton from './checkout-button';
 export default function PricingPage() {
   const bundles = [
     {
+      id: 'starter',
       name: 'Starter',
       price: 10,
       credits: 100,
@@ -13,6 +14,7 @@ export default function PricingPage() {
       popular: false
     },
     {
+      id: 'standard',
       name: 'Standard',
       price: 25,
       credits: 300,
@@ -20,6 +22,7 @@ export default function PricingPage() {
       popular: true
     },
     {
+      id: 'value',
       name: 'Value',
       price: 50,
       credits: 700,
@@ -27,6 +30,7 @@ export default function PricingPage() {
       popular: false
     },
     {
+      id: 'bulk',
       name: 'Bulk',
       price: 100,
       credits: 1600,
@@ -95,8 +99,7 @@ export default function PricingPage() {
               </CardContent>
               <CardFooter>
                 <CheckoutButton 
-                  amount={bundle.price}
-                  credits={bundle.credits}
+                  bundle_id={bundle.id}
                   label="Purchase"
                   className={`w-full py-3 rounded-md font-medium transition-colors border ${
                     bundle.popular 
