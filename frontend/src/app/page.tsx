@@ -40,7 +40,6 @@ export default function LandingPage() {
           <div className="absolute top-0 right-1/3 w-[600px] h-[600px] bg-[#EDE7F6] dark:bg-[#5B2D8E]/20 rounded-full blur-[120px] opacity-50" />
         </div>
         <div className="relative space-y-6">
-          <Badge variant="new">Intelligent Study Platform</Badge>
           <h1 className="text-5xl lg:text-[60px] font-bold leading-[1.1] text-[#1A0A2E] dark:text-white" style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}>
             Elevate Learning.<br />
             Achieve Excellence.
