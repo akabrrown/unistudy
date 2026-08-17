@@ -3,7 +3,7 @@ import { authenticateUser } from '../middleware/auth';
 import { withAIQuota } from '../middleware/quotaGuard';
 import { routeRequest, AIRequest } from '../lib/ai/router';
 import { consumeUserQuota } from '../lib/ai/quota';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabaseAsUser } from '../lib/supabase';
 
 const router = Router();
 router.use(authenticateUser);
@@ -43,7 +43,7 @@ router.post('/generate', withAIQuota('quiz_generation'), async (req: Request, re
         type: q.type || 'mcq'
       }));
       
-      const { error: insertErr } = await supabaseAdmin.from('quiz_questions').insert(toInsert);
+      const { error: insertErr } = await supabaseAsUser(req.user!.jwt).from('quiz_questions').insert(toInsert);
       if (insertErr) {
         console.error('Failed to insert quiz questions:', insertErr);
         if (insertErr.code === '23503') {
@@ -61,13 +61,14 @@ router.post('/generate', withAIQuota('quiz_generation'), async (req: Request, re
 
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const supabase = supabaseAsUser(req.user!.jwt);
     const lectureIdsParam = req.query.lectureIds as string;
     if (!lectureIdsParam) {
       return res.status(400).json({ error: 'lectureIds is required' });
     }
     const lectureIds = lectureIdsParam.split(',');
     
-    const { data, error } = await supabaseAdmin.from('quiz_questions').select('*').in('lecture_id', lectureIds);
+    const { data, error } = await supabase.from('quiz_questions').select('*').in('lecture_id', lectureIds);
     if (error) throw error;
     res.json({ data });
   } catch (err: any) {
@@ -80,7 +81,7 @@ router.post('/attempt', async (req: Request, res: Response) => {
   const userId = req.user!.id;
 
   try {
-    const { error: insertError } = await supabaseAdmin.from('quiz_attempts').insert({
+    const { error: insertError } = await supabaseAsUser(req.user!.jwt).from('quiz_attempts').insert({
       user_id: userId,
       lecture_id: lectureId,
       score,

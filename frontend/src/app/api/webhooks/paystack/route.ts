@@ -40,22 +40,17 @@ export async function POST(req: Request) {
         if (userId && creditsPurchased > 0) {
           // Verify amount loosely
           
-          // Upsert wallet if missing, otherwise RPC is safer, but let's just do a direct lookup and increment.
-          // Wait, Supabase RPC `increment_credit_wallet` would be better, let's just fetch and update.
-          const { data: wallet } = await adminSupabase.from('credit_wallets').select('balance').eq('user_id', userId).single();
-          
-          if (wallet) {
-            await adminSupabase.from('credit_wallets').update({
-              balance: wallet.balance + creditsPurchased,
-              updated_at: new Date().toISOString()
-            }).eq('user_id', userId)
+          // Use the new atomic RPC to prevent race conditions
+          const { error: rpcError } = await adminSupabase.rpc('increment_credit_wallet', {
+            p_user_id: userId,
+            p_amount: creditsPurchased
+          });
+
+          if (rpcError) {
+            console.error('Failed to increment credit wallet via RPC:', rpcError);
           } else {
-            await adminSupabase.from('credit_wallets').insert({
-              user_id: userId,
-              balance: creditsPurchased
-            })
+            console.log(`Topped up ${creditsPurchased} credits for user ${userId}`);
           }
-          console.log(`Topped up ${creditsPurchased} credits for user ${userId}`);
 
         // 3. Log to audit
         await adminSupabase.from('ai_request_log').insert({

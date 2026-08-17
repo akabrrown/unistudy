@@ -115,3 +115,10 @@ export const FREE_DAILY_ALLOWANCES: Record<string, number> = {
   cohere: 0, // Cohere has no free daily allowance, strictly uses credits or fallback if needed
   youtube: 300
 }
+
+export const CREDIT_BUNDLES: Record<string, { price: number; credits: number }> = {
+  starter:  { price: 10,  credits: 10000  },
+  standard: { price: 25,  credits: 30000  },
+  value:    { price: 50,  credits: 70000  },
+  bulk:     { price: 100, credits: 160000 }
+}

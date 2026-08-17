@@ -1,9 +1,24 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { authenticateUser } from '../middleware/auth';
 import { supabaseAsUser } from '../lib/supabase';
 
 const router = Router();
 router.use(authenticateUser);
+
+const LectureInsertSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  course_id: z.string().uuid(),
+  week: z.number().int().min(1).max(30).optional(),
+  file_url: z.string().url().optional(),
+});
+
+const LectureUpdateSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  week: z.number().int().min(1).max(30).optional(),
+  file_url: z.string().url().optional(),
+  processing: z.boolean().optional(),
+}).strict();
 
 router.get('/detail/:lectureId', async (req: Request, res: Response) => {
   const supabase = supabaseAsUser(req.user!.jwt);
@@ -26,8 +41,12 @@ router.get('/:courseId', async (req: Request, res: Response) => {
 });
 
 router.post('/', async (req: Request, res: Response) => {
+  const parsed = LectureInsertSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid payload', details: parsed.error.format() });
+  }
   const supabase = supabaseAsUser(req.user!.jwt);
-  const { data, error } = await supabase.from('lectures').insert(req.body).select().single();
+  const { data, error } = await supabase.from('lectures').insert({ ...parsed.data, user_id: req.user!.id }).select().single();
   
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -60,10 +79,14 @@ router.get('/:slideId/notes', async (req: Request, res: Response) => {
 });
 
 router.patch('/:id', async (req: Request, res: Response) => {
+  const parsed = LectureUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid payload', details: parsed.error.format() });
+  }
   const supabase = supabaseAsUser(req.user!.jwt);
   const { data, error } = await supabase
     .from('lectures')
-    .update(req.body)
+    .update(parsed.data)
     .eq('id', req.params.id)
     .select()
     .single();

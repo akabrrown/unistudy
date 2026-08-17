@@ -287,7 +287,7 @@ export default function FlashcardsPage() {
                   </Button>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-widest text-primary-foreground/70 mb-6">Answer</span>
-                <div className="text-xl font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: translatedBack || card.back }} />
+                <div className="text-xl font-medium leading-relaxed whitespace-pre-wrap">{translatedBack || card.back}</div>
                 
                 {mnemonicsData && (
                   <div className="mt-8 text-left text-sm bg-black/10 p-4 rounded-xl w-full max-w-sm">

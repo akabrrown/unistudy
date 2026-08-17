@@ -3,7 +3,7 @@ import { authenticateUser } from '../middleware/auth';
 import { withAIQuota } from '../middleware/quotaGuard';
 import { routeRequest, AIRequest } from '../lib/ai/router';
 import { consumeUserQuota } from '../lib/ai/quota';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabaseAsUser } from '../lib/supabase';
 import { calculateNextReview, Rating } from '../lib/utils/sm2';
 
 const router = Router();
@@ -19,7 +19,8 @@ router.post('/generate', withAIQuota('flashcard_generation'), async (req: Reques
 
   try {
     // 1. Fetch all slides for the lecture
-    const { data: slides, error: slidesError } = await supabaseAdmin
+    const supabase = supabaseAsUser(req.user!.jwt);
+    const { data: slides, error: slidesError } = await supabase
       .from('slides')
       .select('raw_text, explanation, slide_number')
       .eq('lecture_id', lectureId)
@@ -37,7 +38,7 @@ router.post('/generate', withAIQuota('flashcard_generation'), async (req: Reques
     });
 
     if (combinedText.trim().length < 20) {
-      const { data: lec } = await supabaseAdmin.from('lectures').select('title').eq('id', lectureId).single();
+      const { data: lec } = await supabase.from('lectures').select('title').eq('id', lectureId).single();
       if (lec?.title) {
         combinedText += `\nLecture Title: ${lec.title}`;
       }
@@ -96,7 +97,7 @@ router.post('/generate', withAIQuota('flashcard_generation'), async (req: Reques
     console.log(`[Flashcards] extractedList: ${extractedList.length}, generatedCards after filter: ${generatedCards.length}`)
     
     // 4. Delete existing flashcards for this lecture to allow regeneration
-    await supabaseAdmin.from('flashcards').delete().eq('lecture_id', lectureId).eq('user_id', req.user!.id);
+    await supabase.from('flashcards').delete().eq('lecture_id', lectureId).eq('user_id', req.user!.id);
 
     // 5. Generate embeddings and insert new flashcards into database
     if (generatedCards.length > 0) {
@@ -125,7 +126,7 @@ router.post('/generate', withAIQuota('flashcard_generation'), async (req: Reques
         embedding: embeddings[i] ? `[${embeddings[i].join(',')}]` : null // pgvector format
       }));
 
-      const { error: insertError } = await supabaseAdmin.from('flashcards').insert(cardsToInsert);
+      const { error: insertError } = await supabase.from('flashcards').insert(cardsToInsert);
       if (insertError) throw insertError;
     }
 
@@ -138,13 +139,14 @@ router.post('/generate', withAIQuota('flashcard_generation'), async (req: Reques
 
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const supabase = supabaseAsUser(req.user!.jwt);
     const lectureIdsParam = req.query.lectureIds as string;
     if (!lectureIdsParam) {
       return res.status(400).json({ error: 'lectureIds is required' });
     }
     const lectureIds = lectureIdsParam.split(',');
     
-    const { data, error } = await supabaseAdmin.from('flashcards').select('*').in('lecture_id', lectureIds);
+    const { data, error } = await supabase.from('flashcards').select('*').in('lecture_id', lectureIds);
     if (error) throw error;
     res.json({ data });
   } catch (err: any) {
@@ -155,11 +157,12 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/review', async (req: Request, res: Response) => {
   const { cardId, rating, currentData } = req.body;
   const userId = req.user!.id;
+  const supabase = supabaseAsUser(req.user!.jwt);
 
   try {
     const nextData = calculateNextReview(currentData, rating as Rating);
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('flashcards')
       .update({
         ease_factor: nextData.ease_factor,

@@ -69,6 +69,7 @@ export default function BillingSettings() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
           {[
             { 
+              id: 'starter',
               name: 'Starter', 
               price: 10, 
               credits: 100, 
@@ -76,6 +77,7 @@ export default function BillingSettings() {
               popular: false 
             },
             { 
+              id: 'standard',
               name: 'Standard', 
               price: 25, 
               credits: 300, 
@@ -83,6 +85,7 @@ export default function BillingSettings() {
               popular: true 
             },
             { 
+              id: 'value',
               name: 'Value', 
               price: 50, 
               credits: 700, 
@@ -90,6 +93,7 @@ export default function BillingSettings() {
               popular: false 
             },
             { 
+              id: 'bulk',
               name: 'Bulk', 
               price: 100, 
               credits: 1600, 
@@ -142,8 +146,7 @@ export default function BillingSettings() {
               </CardContent>
               <CardFooter className="pt-0">
                 <CheckoutButton 
-                  amount={bundle.price}
-                  credits={bundle.credits * 100}
+                  bundle_id={bundle.id}
                   label="Purchase Bundle"
                   className={`w-full py-2.5 rounded-lg font-semibold transition-all border text-sm shadow-xs ${
                     bundle.popular 

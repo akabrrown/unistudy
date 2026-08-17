@@ -1,12 +1,51 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Send, Pin, Book } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmojiPicker } from './EmojiPicker';
 import { AttachmentPicker } from './AttachmentPicker';
+
+/** Escape HTML entities to prevent XSS when rendering user content */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/** Render message text with safe @mention highlighting (no dangerouslySetInnerHTML) */
+function renderMessageContent(content: string): ReactNode {
+  const parts: ReactNode[] = [];
+  const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    // Push text before the mention (escaped)
+    if (match.index > lastIndex) {
+      parts.push(<span key={`t-${lastIndex}`}>{content.slice(lastIndex, match.index)}</span>);
+    }
+    // Push the mention as a styled React element
+    parts.push(
+      <span key={`m-${match.index}`} className="text-plum-400 font-bold">
+        @{match[1]}
+      </span>
+    );
+    lastIndex = mentionRegex.lastIndex;
+  }
+
+  // Push remaining text (escaped)
+  if (lastIndex < content.length) {
+    parts.push(<span key={`t-${lastIndex}`}>{content.slice(lastIndex)}</span>);
+  }
+
+  return parts.length > 0 ? parts : content;
+}
 
 interface Message {
   id: string;
@@ -221,7 +260,7 @@ export function GroupChat({ groupId, userRole }: { groupId: string, userRole?: s
                         </div>
                       </div>
                     ) : (
-                      <span dangerouslySetInnerHTML={{ __html: msg.content.replace(/@([a-zA-Z0-9_]+)/g, '<span class="text-plum-400 font-bold">@$1</span>') }} />
+                      <span>{renderMessageContent(msg.content)}</span>
                     )}
 
                     {/* Reactions Display */}

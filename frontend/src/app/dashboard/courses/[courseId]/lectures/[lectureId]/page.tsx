@@ -1091,7 +1091,7 @@ export default function LectureViewer() {
                     <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
                   </div>
                   <div className="p-3 flex-1 flex flex-col">
-                    <h4 className="font-semibold text-sm line-clamp-2 mb-1" dangerouslySetInnerHTML={{ __html: video.title }} />
+                    <h4 className="font-semibold text-sm line-clamp-2 mb-1">{video.title}</h4>
                     <p className="text-xs text-muted-foreground mb-3">{video.channel}</p>
                     <Button size="sm" variant="secondary" className="w-full mt-auto gap-2" onClick={() => handlePinVideo(video)}>
                       <Pin size={14} /> Pin to Course

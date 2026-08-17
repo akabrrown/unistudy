@@ -3,7 +3,7 @@ import { authenticateUser } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { withAIQuota } from '../middleware/quotaGuard';
 import { routeRequest, AIRequest } from '../lib/ai/router';
-import { consumeUserQuota } from '../lib/ai/quota';
+import { consumeUserQuota, checkUserQuota } from '../lib/ai/quota';
 import { supabaseAdmin } from '../lib/supabase';
 
 const router = Router();
@@ -51,7 +51,7 @@ async function callWithFallback(
   throw lastErr;
 }
 
-router.post('/search-math', async (req: Request, res: Response) => {
+router.post('/search-math', withAIQuota('answer_improver'), async (req: Request, res: Response) => {
   try {
     const { type, query } = req.body;
     if (!type || !query) return res.status(400).json({ error: 'Missing type or query' });
@@ -162,9 +162,12 @@ router.post('/ask', async (req: Request, res: Response) => {
   const { feature, payload, priority, identifiers } = req.body;
   if (!feature || !payload) return res.status(400).json({ error: 'Missing feature or payload' });
 
-  // Wrap inside dynamic quota guard conceptually since we need the feature dynamically:
-  // Instead of static middleware, we manually call the quota logic or just run the routeRequest.
-  // Wait, the withAIQuota middleware takes a fixed feature. For dynamic feature, we check manually:
+  // Manually check quota
+  const modelTier = req.body?.model_tier || req.headers?.['x-model-tier'] || 'default';
+  const hasQuota = await checkUserQuota(req.user!.id, feature as any, modelTier as any);
+  if (!hasQuota.allowed) {
+    return res.status(429).json({ error: 'Insufficient credits or quota', details: hasQuota.reason });
+  }
   
   // Fetch user settings
   let userSettings = null;
@@ -455,7 +458,7 @@ The quote must reference their actual situation naturally (e.g. "You have an Eng
   }
 });
 
-router.post('/study-break', async (req: Request, res: Response) => {
+router.post('/study-break', withAIQuota('break_suggestion'), async (req: Request, res: Response) => {
   try {
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -482,7 +485,7 @@ router.post('/study-break', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/anxiety-response', async (req: Request, res: Response) => {
+router.post('/anxiety-response', withAIQuota('chat_message'), async (req: Request, res: Response) => {
   try {
     const { feeling } = req.body;
     

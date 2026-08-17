@@ -17,7 +17,19 @@ cloudinary.config({
   api_secret: env.CLOUDINARY_API_SECRET
 });
 
-const upload = multer({ dest: '/tmp/uploads/' });
+const upload = multer({ 
+  dest: '/tmp/uploads/',
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || file.mimetype === 'image/webp') {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
+    }
+  }
+});
 
 const avatarRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,

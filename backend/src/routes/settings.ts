@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticateUser } from '../middleware/auth';
-import { supabase } from '../config/supabase';
+import { supabaseAsUser } from '../lib/supabase';
 
 const router = Router();
 
@@ -35,6 +35,7 @@ router.use(authenticateUser);
 // GET /api/settings/accessibility
 router.get('/accessibility', async (req: Request, res: Response) => {
   try {
+    const supabase = supabaseAsUser(req.user!.jwt);
     const { data, error } = await supabase
       .from('user_settings')
       .select('*')
@@ -71,10 +72,13 @@ router.patch('/accessibility', async (req: Request, res: Response) => {
   try {
     const updates = req.body;
     
-    // Ensure we don't update user_id
+    // Ensure we don't update user_id or other protected fields
     delete updates.user_id;
     delete updates.created_at;
-    
+    delete updates.id;
+    delete updates.updated_at;
+
+    const supabase = supabaseAsUser(req.user!.jwt);
     const { data, error } = await supabase
       .from('user_settings')
       .update(updates)

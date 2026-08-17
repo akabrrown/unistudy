@@ -7,9 +7,10 @@ import crypto from 'crypto';
 
 const router = Router();
 
+import { CREDIT_BUNDLES } from '../../../shared/constants/quota';
+
 const CheckoutSchema = z.object({
-  amount: z.number().positive(),
-  credits: z.number().positive(),
+  bundle_id: z.string(),
   type: z.literal('credit_topup').optional().default('credit_topup')
 });
 
@@ -23,7 +24,14 @@ router.post('/checkout', requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.format() });
     }
 
-    const { amount, credits, type } = parseResult.data;
+    const { bundle_id, type } = parseResult.data;
+    const bundle = CREDIT_BUNDLES[bundle_id];
+    
+    if (!bundle) {
+      return res.status(400).json({ error: 'Invalid bundle ID' });
+    }
+
+    const { price: amount, credits } = bundle;
     const amountInPesewas = amount * 100; // Convert GHS to pesewas
 
     // Ensure we have a valid site URL for callback

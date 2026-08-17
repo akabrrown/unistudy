@@ -8,6 +8,7 @@ const router = Router();
 
 import { authenticateUser } from '../middleware/auth';
 import { withAIQuota } from '../middleware/quotaGuard';
+import { consumeUserQuota } from '../lib/ai/quota';
 import { AIRequest, routeRequest } from '../lib/ai/router';
 router.use(authenticateUser);
 
@@ -17,7 +18,7 @@ import { supabaseAdmin } from '../lib/supabase';
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Upload and mock OCR extraction
-router.post('/upload', upload.single('file'), async (req: any, res) => {
+router.post('/upload', upload.single('file'), withAIQuota('handwriting_scan'), async (req: any, res) => {
     try {
         const { courseCode, courseName, year, examType } = req.body;
         
@@ -149,6 +150,7 @@ ${extractedText}
             
         if (qErr) throw qErr;
 
+        await consumeUserQuota(req.user!.id, 'handwriting_scan');
         res.json({ success: true, message: "Upload and OCR successful", paper });
     } catch (e: any) {
         console.error("Upload error fully detailed:", e);
@@ -157,7 +159,8 @@ ${extractedText}
     }
 });
 
-router.post('/grade-batch', async (req, res) => {
+// Grade a batch of past paper questions
+router.post('/grade-batch', withAIQuota('past_paper_grading'), async (req, res) => {
     try {
         const { answers, is_ultra, course_id } = req.body;
         
@@ -238,6 +241,7 @@ router.post('/grade-batch', async (req, res) => {
         const text = result.choices[0]?.message?.content || '{"results":[]}';
         const parsed = JSON.parse(text);
         
+        await consumeUserQuota(req.user!.id, 'past_paper_grading');
         res.json({ success: true, data: parsed.results || [] });
     } catch (err: any) {
         console.error('Error grading batch:', err);
@@ -245,7 +249,7 @@ router.post('/grade-batch', async (req, res) => {
     }
 });
 
-router.post('/grade', async (req, res) => {
+router.post('/grade', withAIQuota('past_paper_grading'), async (req, res) => {
     try {
         const { question_content, marks_available, student_answer, is_ultra, course_id } = req.body;
         
@@ -314,6 +318,7 @@ router.post('/grade', async (req, res) => {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("AI did not return valid JSON");
         
+        await consumeUserQuota(req.user!.id, 'past_paper_grading');
         res.json({ success: true, data: JSON.parse(jsonMatch[0]) });
     } catch (err: any) {
         console.error('Error grading:', err);
@@ -321,7 +326,8 @@ router.post('/grade', async (req, res) => {
     }
 });
 
-router.post('/chat', async (req, res) => {
+// Generic chat about a past paper item
+router.post('/chat', withAIQuota('past_paper_question'), async (req, res) => {
     try {
         const { question_content, student_answer, feedback, user_message } = req.body;
         
@@ -339,6 +345,8 @@ router.post('/chat', async (req, res) => {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
         const result = await model.generateContent(prompt);
+        
+        await consumeUserQuota(req.user!.id, 'past_paper_question');
         res.json({ text: result.response.text() });
     } catch (err: any) {
         res.status(500).json({ error: err.message });

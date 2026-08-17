@@ -151,7 +151,7 @@ export function YouTubeStudyClient({
                 </div>
               </div>
               <CardContent className="p-3">
-                <h3 className="font-semibold text-sm line-clamp-2 mb-1" dangerouslySetInnerHTML={{ __html: video.title }} />
+                <h3 className="font-semibold text-sm line-clamp-2 mb-1">{video.title}</h3>
                 <p className="text-xs text-muted-foreground mb-3">{video.channel}</p>
                 
                 {courses.length > 0 ? (
@@ -235,7 +235,7 @@ export function YouTubeStudyClient({
                     </div>
                     <CardContent className="p-3">
                       <div className="text-[10px] font-bold text-primary mb-1 uppercase tracking-wider">{course?.course_code}</div>
-                      <h3 className="font-semibold text-sm line-clamp-2 mb-1" dangerouslySetInnerHTML={{ __html: video.title }} />
+                      <h3 className="font-semibold text-sm line-clamp-2 mb-1">{video.title}</h3>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           {video.channel}

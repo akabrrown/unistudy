@@ -6,6 +6,8 @@ import Groq from 'groq-sdk';
 
 const router = Router();
 router.use(authenticateUser);
+import { withAIQuota } from '../middleware/quotaGuard';
+import { consumeUserQuota } from '../lib/ai/quota';
 
 // Generate drills based on weak performance in an attempt
 router.post('/generate-from-attempt', async (req: any, res: any) => {
@@ -103,7 +105,7 @@ router.post('/generate-from-attempt', async (req: any, res: any) => {
 });
 
 // Generate dynamic practice questions for a specific drill
-router.get('/:id/practice', async (req: any, res: any) => {
+router.get('/:id/practice', withAIQuota('weakness_drill'), async (req: any, res: any) => {
     try {
         const drillId = req.params.id;
         const supabase = supabaseAsUser(req.user!.jwt);
@@ -145,6 +147,7 @@ router.get('/:id/practice', async (req: any, res: any) => {
         const text = result.choices[0]?.message?.content || '{"questions":[]}';
         const parsed = JSON.parse(text);
 
+        await consumeUserQuota(req.user!.id, 'weakness_drill');
         res.json({ success: true, questions: parsed.questions || [], drill });
     } catch (err: any) {
         console.error('Error getting practice:', err);
@@ -156,7 +159,11 @@ router.get('/:id/practice', async (req: any, res: any) => {
 router.post('/:id/submit', async (req: any, res: any) => {
     try {
         const drillId = req.params.id;
-        const { score, total } = req.body; // Expecting frontend to grade MCQs, but we just trust it for now.
+        const { score, total } = req.body; 
+        
+        if (typeof score !== 'number' || typeof total !== 'number' || score < 0 || total < 1 || score > total || total > 20) {
+            return res.status(400).json({ error: 'Invalid score payload' });
+        }
         
         const supabase = supabaseAsUser(req.user!.jwt);
         

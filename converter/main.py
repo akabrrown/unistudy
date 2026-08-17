@@ -7,21 +7,47 @@ import base64
 import fitz  # PyMuPDF
 import cloudinary
 import cloudinary.uploader
-from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, HTTPException, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from typing import Optional, List
 from ai_utils import execute_ai_task, openrouter_low_priority, gemini_vision, groq70b, huggingface_search, cohere_rerank, RerankRequest, supabase
 
 app = FastAPI()
 
+# Restrict CORS to known frontend/backend origins only
+_allowed_origins = [
+    os.getenv("FRONTEND_URL", "http://localhost:3000"),
+    os.getenv("BACKEND_URL", "http://localhost:8005"),
+    "https://app.unistudy.ai",
+    "https://unistudy.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["X-RateLimit-Remaining", "X-RateLimit-Reset"],
+    max_age=86400,
 )
+
+# ---------------------------------------------------------------------------
+# Shared-secret authentication for internal service calls
+# ---------------------------------------------------------------------------
+_converter_secret = os.getenv("CONVERTER_SECRET", "")
+_api_key_header = APIKeyHeader(name="X-Converter-Secret", auto_error=False)
+
+async def verify_converter_secret(api_key: Optional[str] = Security(_api_key_header)):
+    """Reject requests that don't carry the shared converter secret."""
+    if not _converter_secret:
+        # If CONVERTER_SECRET is not configured, reject all calls
+        raise HTTPException(status_code=500, detail="Converter secret not configured")
+    if api_key != _converter_secret:
+        raise HTTPException(status_code=401, detail="Invalid converter secret")
+    return api_key
 
 # ---------------------------------------------------------------------------
 # Request models (JSON body instead of Form data)
@@ -207,7 +233,7 @@ def process_file_task(file_path: str, lecture_id: str, user_id: str, is_pptx: bo
             shutil.rmtree(temp_dir)
 
 
-@app.post("/convert")
+@app.post("/convert", dependencies=[Depends(verify_converter_secret)])
 async def convert_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -241,7 +267,7 @@ def health_check():
 
 # Low-priority free-tier endpoint (e.g., quotes, nudges)
 
-@app.post("/low-priority")
+@app.post("/low-priority", dependencies=[Depends(verify_converter_secret)])
 async def low_priority_endpoint(body: LowPriorityRequest):
     """Handle low-priority free-tier text tasks via OpenRouter.
     Uses the free Llama-3-8B model by default. Quota is tracked under the
@@ -261,7 +287,7 @@ async def low_priority_endpoint(body: LowPriorityRequest):
 # ------------------------------------------------------------
 # Vision endpoint – uses Gemini Flash (layer 1)
 # ------------------------------------------------------------
-@app.post("/vision")
+@app.post("/vision", dependencies=[Depends(verify_converter_secret)])
 async def vision_endpoint(body: VisionRequest):
     """Handle vision tasks (slide-explanation, PDF parsing, etc.).
     The caller must supply a base64-encoded PDF or image and a prompt.
@@ -289,7 +315,7 @@ async def vision_endpoint(body: VisionRequest):
 # ------------------------------------------------------------
 # Streaming endpoint – uses Groq 70B (real‑time)
 # ------------------------------------------------------------
-@app.post("/stream")
+@app.post("/stream", dependencies=[Depends(verify_converter_secret)])
 async def stream_endpoint(body: StreamRequest):
     """Real-time chat / calculator via Groq 70B.
     ``messages`` should be a list of ``{"role":…, "content":…}`` objects.
@@ -308,7 +334,7 @@ async def stream_endpoint(body: StreamRequest):
 # ------------------------------------------------------------
 # Generate endpoint – batch text generation (uses Gemini Flash)
 # ------------------------------------------------------------
-@app.post("/generate")
+@app.post("/generate", dependencies=[Depends(verify_converter_secret)])
 async def generate_endpoint(body: GenerateRequest):
     """Batch text generation (flashcards, summaries, etc.)."""
     payload = {"prompt": body.prompt}
@@ -325,7 +351,7 @@ async def generate_endpoint(body: GenerateRequest):
 # ------------------------------------------------------------
 # Rerank endpoint – uses Cohere for relevance scoring (internal only)
 # ------------------------------------------------------------
-@app.post("/rerank")
+@app.post("/rerank", dependencies=[Depends(verify_converter_secret)])
 async def rerank_endpoint(body: RerankRequest):
     """Rerank a list of candidate documents using Cohere.
     Returns the reordered list (top_n) with scores.
@@ -349,7 +375,7 @@ async def rerank_endpoint(body: RerankRequest):
 # ------------------------------------------------------------
 # Embed / search endpoint – uses HuggingFace (no quota limit)
 # ------------------------------------------------------------
-@app.post("/embed")
+@app.post("/embed", dependencies=[Depends(verify_converter_secret)])
 async def embed_endpoint(
     user_id: str = Form(...),
     model: str = Form(...),

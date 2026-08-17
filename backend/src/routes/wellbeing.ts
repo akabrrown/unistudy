@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticateUser } from '../middleware/auth';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabaseAsUser } from '../lib/supabase';
 
 const router = Router();
 router.use(authenticateUser);
@@ -8,9 +8,9 @@ router.use(authenticateUser);
 router.post('/sessions', async (req: Request, res: Response) => {
   try {
     const { course_id, duration_minutes, status } = req.body;
+    const supabase = supabaseAsUser(req.user!.jwt);
     
-    // We expect end_time to be now() since this triggers at end of Pomodoro
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('study_sessions')
       .insert({
         user_id: req.user!.id,
@@ -32,8 +32,9 @@ router.post('/sessions', async (req: Request, res: Response) => {
 router.post('/anxiety', async (req: Request, res: Response) => {
   try {
     const { event_id, feeling, ai_suggestion } = req.body;
+    const supabase = supabaseAsUser(req.user!.jwt);
     
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('anxiety_check_ins')
       .insert({
         user_id: req.user!.id,
@@ -54,8 +55,9 @@ router.post('/anxiety', async (req: Request, res: Response) => {
 router.post('/break-rating', async (req: Request, res: Response) => {
   try {
     const { suggestion, rating } = req.body;
+    const supabase = supabaseAsUser(req.user!.jwt);
     
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('study_break_preferences')
       .insert({
         user_id: req.user!.id,
@@ -74,11 +76,12 @@ router.post('/break-rating', async (req: Request, res: Response) => {
 
 router.get('/badges', async (req: Request, res: Response) => {
   try {
+    const supabase = supabaseAsUser(req.user!.jwt);
     // Get last 7 days of sessions
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('study_sessions')
       .select('duration_minutes, status, created_at')
       .eq('user_id', req.user!.id)

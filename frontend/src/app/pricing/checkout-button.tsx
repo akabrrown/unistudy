@@ -5,13 +5,11 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
 
 export default function CheckoutButton({ 
-  amount,
-  credits, 
+  bundle_id, 
   label, 
   className 
 }: { 
-  amount?: number;
-  credits?: number; 
+  bundle_id?: string;
   label: string; 
   className: string; 
 }) {
@@ -19,7 +17,7 @@ export default function CheckoutButton({
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = async () => {
-    if (!amount || !credits) {
+    if (!bundle_id) {
       router.push('/dashboard');
       return;
     }
@@ -28,7 +26,7 @@ export default function CheckoutButton({
     try {
       const data = await apiFetch('/payments/checkout', {
         method: 'POST',
-        body: JSON.stringify({ amount, credits, type: 'credit_topup' })
+        body: JSON.stringify({ bundle_id, type: 'credit_topup' })
       });
       if (data.url) {
         window.location.href = data.url;

@@ -38,7 +38,7 @@ export default function YouTubeWatchPage({ params }: { params: Promise<{ videoId
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold line-clamp-1" dangerouslySetInnerHTML={{ __html: title }} />
+            <h1 className="text-xl font-bold line-clamp-1">{title}</h1>
             {channel && <p className="text-sm text-muted-foreground">{channel}</p>}
           </div>
         </div>
