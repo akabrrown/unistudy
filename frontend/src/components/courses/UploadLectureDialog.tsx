@@ -49,15 +49,18 @@ export function UploadLectureDialog({ courseId, courseCode }: UploadLectureDialo
 
       try {
         const fileWeek = fileWeeks[i];
+        const payload: any = {
+          course_id: courseId,
+          title: file.name
+        };
+        if (fileWeek) {
+          payload.week = parseInt(fileWeek);
+        }
+        
         // Insert lecture placeholder
         const newLecture = await apiFetch('/lectures', {
           method: 'POST',
-          body: JSON.stringify({ 
-            course_id: courseId, 
-            file_url: '', 
-            title: file.name, 
-            week: fileWeek ? parseInt(fileWeek) : null 
-          })
+          body: JSON.stringify(payload)
         });
 
         // 1. Upload the original file to Cloudinary
@@ -109,6 +112,9 @@ export function UploadLectureDialog({ courseId, courseCode }: UploadLectureDialo
         const fastapiUrl = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://localhost:8000';
         const convertRes = await fetch(`${fastapiUrl}/convert`, {
           method: 'POST',
+          headers: {
+            'X-Converter-Secret': process.env.NEXT_PUBLIC_CONVERTER_SECRET || '',
+          },
           body: formDataFastAPI,
         });
 

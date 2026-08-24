@@ -46,7 +46,7 @@ router.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid payload', details: parsed.error.format() });
   }
   const supabase = supabaseAsUser(req.user!.jwt);
-  const { data, error } = await supabase.from('lectures').insert({ ...parsed.data, user_id: req.user!.id }).select().single();
+  const { data, error } = await supabase.from('lectures').insert(parsed.data).select().single();
   
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);

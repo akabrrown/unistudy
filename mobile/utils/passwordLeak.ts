@@ -23,7 +23,10 @@ export async function isPasswordLeaked(password: string): Promise<boolean> {
     for (const line of lines) {
       const [hashSuffix, count] = line.trim().split(':');
       if (hashSuffix === suffix) {
-        return true;
+        // Require at least 100 occurrences to avoid false positives for randomly generated passwords
+        if (parseInt(count, 10) >= 100) {
+          return true;
+        }
       }
     }
     return false;

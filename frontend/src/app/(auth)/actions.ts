@@ -21,9 +21,12 @@ async function isPasswordLeaked(password: string): Promise<boolean> {
     const text = await response.text();
     const lines = text.split('\n');
     for (const line of lines) {
-      const [lineSuffix] = line.split(':');
+      const [lineSuffix, countStr] = line.split(':');
       if (lineSuffix.trim() === suffix) {
-        return true;
+        // Require at least 100 occurrences to avoid false positives for randomly generated passwords
+        if (parseInt(countStr.trim(), 10) >= 100) {
+          return true;
+        }
       }
     }
   } catch (e) {

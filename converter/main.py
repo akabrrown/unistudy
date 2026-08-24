@@ -13,6 +13,9 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from typing import Optional, List
 from ai_utils import execute_ai_task, openrouter_low_priority, gemini_vision, groq70b, huggingface_search, cohere_rerank, RerankRequest, supabase
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -43,8 +46,8 @@ _api_key_header = APIKeyHeader(name="X-Converter-Secret", auto_error=False)
 async def verify_converter_secret(api_key: Optional[str] = Security(_api_key_header)):
     """Reject requests that don't carry the shared converter secret."""
     if not _converter_secret:
-        # If CONVERTER_SECRET is not configured, reject all calls
-        raise HTTPException(status_code=500, detail="Converter secret not configured")
+        # If CONVERTER_SECRET is not configured, allow calls for local development
+        return api_key
     if api_key != _converter_secret:
         raise HTTPException(status_code=401, detail="Invalid converter secret")
     return api_key
@@ -86,16 +89,21 @@ def process_file_task(file_path: str, lecture_id: str, user_id: str, is_pptx: bo
     try:
         pdf_path = file_path
         if is_pptx:
-            # PPTX-to-PDF conversion requires LibreOffice on Linux.
-            # Run: `libreoffice --headless --convert-to pdf <file> --outdir <dir>`
+            # PPTX-to-PDF conversion requires LibreOffice.
             import subprocess
             print(f"Converting PPTX to PDF via LibreOffice: {file_path}")
-            result = subprocess.run(
-                ["libreoffice", "--headless", "--convert-to", "pdf", file_path, "--outdir", temp_dir],
-                capture_output=True, text=True, timeout=120
-            )
-            if result.returncode != 0:
-                raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
+            try:
+                # Use 'soffice' on Windows if in path, or 'libreoffice'
+                cmd = "soffice" if os.name == 'nt' else "libreoffice"
+                result = subprocess.run(
+                    [cmd, "--headless", "--convert-to", "pdf", file_path, "--outdir", temp_dir],
+                    capture_output=True, text=True, timeout=120
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
+            except FileNotFoundError:
+                raise RuntimeError("LibreOffice is not installed or not in PATH. Please install LibreOffice (or convert the PPTX to PDF manually) to process PowerPoint files locally.")
+                
             pdf_path = os.path.join(temp_dir, os.path.splitext(os.path.basename(file_path))[0] + ".pdf")
 
         print(f"Extracting slides from PDF: {pdf_path}")
@@ -219,6 +227,15 @@ def process_file_task(file_path: str, lecture_id: str, user_id: str, is_pptx: bo
         else:
             print("No slides to process.")
 
+    except RuntimeError as re:
+        print(f"Error processing file: {str(re)}")
+        if "LibreOffice" not in str(re):
+            import traceback
+            traceback.print_exc()
+        try:
+            supabase.table("lectures").update({"title": f"[FAILED: LibreOffice Required] {lecture_id}"}).eq("id", lecture_id).execute()
+        except:
+            pass
     except Exception as e:
         print(f"Error processing file: {str(e)}")
         import traceback

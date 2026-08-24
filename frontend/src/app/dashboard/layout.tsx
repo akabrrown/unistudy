@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 
 import { AnnouncementBanner } from '@/components/layout/AnnouncementBanner'
+import { MobileSidebar } from '@/components/layout/MobileSidebar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -52,15 +53,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .limit(1)
     .single()
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-card border-r border-border p-4 flex flex-col">
-        <div className="mb-6">
-          <img src="/logo.jpeg" alt="UniStudy AI" className="h-10 w-auto object-contain dark:hidden" />
-          <img src="/logo-dark.jpeg" alt="UniStudy AI" className="h-10 w-auto object-contain hidden dark:block" />
-        </div>
-        <div className="mb-6 px-2">
+  const sidebarContent = (
+    <>
+        <div className="mb-6 px-2 pt-2 md:pt-0">
           <SmartSearchBar />
         </div>
         <nav className="space-y-1 flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar">
@@ -113,7 +108,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </Link>
           )}
         </nav>
-        <div className="mt-auto border-t border-border pt-4">
+        <div className="mt-auto border-t border-border pt-4 px-4 pb-4 md:px-0 md:pb-0">
           <div className="flex items-center gap-3 mb-4 px-2">
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt="Avatar" className="w-10 h-10 rounded-full object-cover" />
@@ -140,7 +135,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
           <ModelSelector />
 
-          <div className="flex items-center gap-2 mb-6 px-2">
+          <div className="flex items-center gap-2 mb-2 md:mb-6 px-2">
             <div className="flex-1">
               <form action={signout}>
                 <Button variant="outline" className="w-full" type="submit">Sign Out</Button>
@@ -151,10 +146,26 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
           </div>
         </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+      <MobileSidebar>
+        {sidebarContent}
+      </MobileSidebar>
+
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 bg-card border-r border-border p-4 flex-col fixed inset-y-0 left-0 z-10">
+        <div className="mb-6">
+          <img src="/logo.jpeg" alt="UniStudy AI" className="h-10 w-auto object-contain dark:hidden" />
+          <img src="/logo-dark.jpeg" alt="UniStudy AI" className="h-10 w-auto object-contain hidden dark:block" />
+        </div>
+        {sidebarContent}
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto relative">
+      <main className="flex-1 p-4 md:p-8 md:ml-64 overflow-y-auto relative min-h-screen">
         <AnnouncementBanner announcement={latestAnnouncement} />
         {children}
       </main>
